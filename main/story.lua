@@ -185,7 +185,7 @@ S.scenes.hall = {
 		{ label = "신발장을 살핀다", next = "hall_shoes" },
 		{ label = "열쇠 걸이를 본다", next = "hall_key" },
 		{ label = "숙박부를 읽는다", next = "hall_register" },
-		{ label = "마당으로", next = "yard" },
+		{ label = "마당으로", next = "yard", back = true },
 	},
 }
 
@@ -203,7 +203,7 @@ S.scenes.hall_shoes = {
 강도윤의 장화는 없다. 지금 신고 있을 것이다. 한명희의 고무신. 서연우의 여자 부츠, 굽에 모래. 백현식의 헝겊신 한 켤레, 옆에 지팡이 자국이 난 바닥.]],
 	on_enter = clues("shoes_lim", "boots_dry"),
 	choices = {
-		{ label = "현관으로", next = "hall" },
+		{ label = "현관으로", next = "hall", back = true },
 	},
 }
 
@@ -215,7 +215,7 @@ S.scenes.hall_key = {
 등대 열쇠에 진흙이 묻어 있다. 못에도 묻어 있다. 아직 마르지 않았다. 밤사이 누군가 진흙 묻은 손으로 이 열쇠를 가져갔다가 도로 걸었다.]],
 	on_enter = clue("key_mud"),
 	choices = {
-		{ label = "현관으로", next = "hall" },
+		{ label = "현관으로", next = "hall", back = true },
 	},
 }
 
@@ -232,7 +232,7 @@ S.scenes.hall_register = {
 3년째. 백조호가 가라앉은 것이 3년 전이다. 백현식이라는 이름은 백조호의 선장 이름과 같다.]],
 	on_enter = clue("register"),
 	choices = {
-		{ label = "현관으로", next = "hall" },
+		{ label = "현관으로", next = "hall", back = true },
 	},
 }
 
@@ -253,7 +253,7 @@ S.scenes.dining = {
 		{ label = "장길수와 이야기한다", next = "talk_jang" },
 		{ label = "한명희와 이야기한다", next = "talk_han" },
 		{ label = "벽의 액자를 본다", next = "dining_frame" },
-		{ label = "마당으로", next = "yard" },
+		{ label = "마당으로", next = "yard", back = true },
 	},
 }
 
@@ -272,7 +272,7 @@ S.scenes.dining_frame = {
 강동수. 여관 주인 한명희의 성은 한씨지만, 아들은 강도윤이다.]],
 	on_enter = clue("memorial"),
 	choices = {
-		{ label = "식당으로", next = "dining" },
+		{ label = "식당으로", next = "dining", back = true },
 	},
 }
 
@@ -292,7 +292,7 @@ S.scenes.talk_jang = {
 		{ label = "어젯밤 어디 있었나", next = "jang_night" },
 		{ label = "3년 전 백조호", next = "jang_past" },
 		{ label = "임지호에 대해", next = "jang_lim" },
-		{ label = "식당으로", next = "dining" },
+		{ label = "식당으로", next = "dining", back = true },
 	},
 }
 
@@ -363,7 +363,7 @@ S.scenes.talk_han = {
 		{ label = "남편에 대해", next = "han_husband" },
 		{ label = "반짇고리에 대해", next = "han_sewing", cond = has("coat_button") },
 		{ label = "김씨네 형제에 대해", next = "han_kim", cond = any(has("photo"), flag("heard_kim")) },
-		{ label = "식당으로", next = "dining" },
+		{ label = "식당으로", next = "dining", back = true },
 	},
 }
 
@@ -449,7 +449,7 @@ S.scenes.corridor = {
 		{ label = "2호 · 서연우의 방", next = "room2" },
 		{ label = "3호 · 백현식의 방", next = "room3" },
 		{ label = "4호 · 임지호의 방", next = "room4" },
-		{ label = "내려간다", next = "yard" },
+		{ label = "내려간다", next = "yard", back = true },
 	},
 }
 
@@ -463,7 +463,7 @@ S.scenes.room1 = {
 		{ label = "구겨진 종이를 편다", next = "room1_telegram" },
 		{ label = "가방을 연다", next = "room1_papers" },
 		{ label = "위스키 병을 본다", next = "room1_whisky" },
-		{ label = "복도로", next = "corridor" },
+		{ label = "복도로", next = "corridor", back = true },
 	},
 }
 
@@ -479,7 +479,7 @@ S.scenes.room1_telegram = {
 윤재석은 백조호를 조사하러 온 것이 아니다. 무언가를 없애러 왔다.]],
 	on_enter = clue("telegram"),
 	choices = {
-		{ label = "방을 둘러본다", next = "room1" },
+		{ label = "방을 둘러본다", next = "room1", back = true },
 	},
 }
 
@@ -493,7 +493,7 @@ S.scenes.room1_papers = {
 그 밖에 백조호 보험금 지급 서류 사본. 우리 회사 도장이 찍혀 있다.]],
 	on_enter = clue("roster"),
 	choices = {
-		{ label = "방을 둘러본다", next = "room1" },
+		{ label = "방을 둘러본다", next = "room1", back = true },
 	},
 }
 
@@ -505,7 +505,7 @@ S.scenes.room1_whisky = {
 혼자 마셨다. 상당히 마셨다. 등대 계단을 오르기에는 나쁜 상태였을 것이다.]],
 	on_enter = clue("whisky"),
 	choices = {
-		{ label = "방을 둘러본다", next = "room1" },
+		{ label = "방을 둘러본다", next = "room1", back = true },
 	},
 }
 
@@ -518,7 +518,7 @@ S.scenes.room2 = {
 	choices = {
 		{ label = "노트를 펼친다", next = "room2_note" },
 		{ label = "외투를 살핀다", next = "room2_coat" },
-		{ label = "복도로", next = "corridor" },
+		{ label = "복도로", next = "corridor", back = true },
 	},
 }
 
@@ -530,7 +530,7 @@ S.scenes.room2_note = {
 어젯밤 날짜가 적힌 쪽에 알아볼 수 있는 글자가 몇 개 섞여 있다. 「3호」. 「등대」. 「궤짝」. 그리고 밑줄 친 시각, 「9시」.]],
 	on_enter = clue("shorthand"),
 	choices = {
-		{ label = "방을 둘러본다", next = "room2" },
+		{ label = "방을 둘러본다", next = "room2", back = true },
 	},
 }
 
@@ -544,7 +544,7 @@ S.scenes.room2_coat = {
 사진사가 아니다. 전보의 「기자 서」가 이 사람이다.]],
 	on_enter = clue("press_id"),
 	choices = {
-		{ label = "방을 둘러본다", next = "room2" },
+		{ label = "방을 둘러본다", next = "room2", back = true },
 	},
 }
 
@@ -567,7 +567,7 @@ S.scenes.room3 = {
 		{ label = "백현식과 이야기한다", next = "talk_baek" },
 		{ label = "책상의 편지를 읽는다", next = "room3_letter" },
 		{ label = "머리맡을 본다", next = "room3_meds" },
-		{ label = "복도로", next = "corridor" },
+		{ label = "복도로", next = "corridor", back = true },
 	},
 }
 
@@ -581,7 +581,7 @@ S.scenes.room3_letter = {
 백현식은 이쪽을 보지 않는다.]],
 	on_enter = clue("letter_draft"),
 	choices = {
-		{ label = "방을 둘러본다", next = "room3" },
+		{ label = "방을 둘러본다", next = "room3", back = true },
 	},
 }
 
@@ -593,7 +593,7 @@ S.scenes.room3_meds = {
 지팡이 손잡이가 손때로 반질반질하다. 이 사람은 등대 계단을 오를 수 없다. 여관 2층까지 올라오는 데도 한명희의 아들 강도윤이 부축한다고 한다.]],
 	on_enter = clue("meds"),
 	choices = {
-		{ label = "방을 둘러본다", next = "room3" },
+		{ label = "방을 둘러본다", next = "room3", back = true },
 	},
 }
 
@@ -616,7 +616,7 @@ S.scenes.talk_baek = {
 		{ label = "백조호에 대해", next = "baek_ship" },
 		{ label = "편지 초안을 내민다", next = "baek_confess", cond = all(has("letter_draft"), noflag("baek_admitted")) },
 		{ label = "항해일지를 읽었다고 말한다", next = "baek_confess", cond = all(has("logbook"), noflag("baek_admitted")) },
-		{ label = "방을 둘러본다", next = "room3" },
+		{ label = "방을 둘러본다", next = "room3", back = true },
 	},
 }
 
@@ -672,7 +672,7 @@ S.scenes.baek_confess = {
 		st:add_clue("lie_chest")
 	end,
 	choices = {
-		{ label = "다른 것을 묻는다", next = "talk_baek" },
+		{ label = "다른 것을 묻는다", next = "talk_baek", back = true },
 	},
 }
 
@@ -685,7 +685,7 @@ S.scenes.room4 = {
 	choices = {
 		{ label = "코트를 살핀다", next = "room4_coat" },
 		{ label = "가방을 연다", next = "room4_bag" },
-		{ label = "복도로", next = "corridor" },
+		{ label = "복도로", next = "corridor", back = true },
 	},
 }
 
@@ -699,7 +699,7 @@ S.scenes.room4_coat = {
 원래 단추는 어디에 있는가.]],
 	on_enter = clue("coat_button"),
 	choices = {
-		{ label = "방을 둘러본다", next = "room4" },
+		{ label = "방을 둘러본다", next = "room4", back = true },
 	},
 }
 
@@ -713,7 +713,7 @@ S.scenes.room4_bag = {
 뒷면. 「태오, 지호. 무영도.」]],
 	on_enter = clue("photo"),
 	choices = {
-		{ label = "방을 둘러본다", next = "room4" },
+		{ label = "방을 둘러본다", next = "room4", back = true },
 	},
 }
 
@@ -735,7 +735,7 @@ S.scenes.lighthouse = {
 	choices = {
 		{ label = "임지호와 이야기한다", next = "talk_lim" },
 		{ label = "등대 안으로 들어간다", next = "lh_inside" },
-		{ label = "마당으로", next = "yard" },
+		{ label = "마당으로", next = "yard", back = true },
 	},
 }
 
@@ -758,7 +758,7 @@ S.scenes.talk_lim = {
 		{ label = "윤재석은 어떤 사람이었나", next = "lim_boss", cond = noflag("lim_silent") },
 		{ label = "사진을 내민다", next = "lim_photo", cond = all(has("photo"), any(has("memorial"), has("resemblance")), noflag("lim_identity_done")) },
 		{ label = "단추 이야기를 꺼낸다", next = "lim_button", cond = all(has("brass_button"), has("coat_button"), noflag("lim_silent")) },
-		{ label = "등대 앞으로", next = "lighthouse" },
+		{ label = "등대 앞으로", next = "lighthouse", back = true },
 	},
 }
 
@@ -807,7 +807,7 @@ S.scenes.lim_photo = {
 		st:add_clue("lim_identity")
 	end,
 	choices = {
-		{ label = "다른 것을 묻는다", next = "talk_lim" },
+		{ label = "다른 것을 묻는다", next = "talk_lim", back = true },
 	},
 }
 
@@ -828,7 +828,7 @@ S.scenes.lim_button = {
 		st:add_clue("lim_silence")
 	end,
 	choices = {
-		{ label = "등대 앞으로", next = "lighthouse" },
+		{ label = "등대 앞으로", next = "lighthouse", back = true },
 	},
 }
 
@@ -849,7 +849,7 @@ S.scenes.lh_inside = {
 		{ label = "시신을 살핀다", next = "lh_body" },
 		{ label = "계단을 오른다", next = "lh_stairs" },
 		{ label = "강도윤과 이야기한다", next = "talk_doyun" },
-		{ label = "밖으로", next = "lighthouse" },
+		{ label = "밖으로", next = "lighthouse", back = true },
 	},
 }
 
@@ -873,7 +873,7 @@ S.scenes.lh_body = {
 		st:set("can_report", true)
 	end,
 	choices = {
-		{ label = "등대 안으로", next = "lh_inside" },
+		{ label = "등대 안으로", next = "lh_inside", back = true },
 	},
 }
 
@@ -890,7 +890,7 @@ S.scenes.lh_stairs = {
 	on_enter = clue("footprints"),
 	choices = {
 		{ label = "램프실로 들어간다", next = "lh_top" },
-		{ label = "내려간다", next = "lh_inside" },
+		{ label = "내려간다", next = "lh_inside", back = true },
 	},
 }
 
@@ -904,7 +904,7 @@ S.scenes.lh_top = {
 바닥에 램프실 문 쪽으로 몸이 끌린 자국은 없다. 다툼은 계단 위, 문턱에서 일어났다.]],
 	on_enter = clue("empty_chest"),
 	choices = {
-		{ label = "내려간다", next = "lh_inside" },
+		{ label = "내려간다", next = "lh_inside", back = true },
 	},
 }
 
@@ -924,7 +924,7 @@ S.scenes.talk_doyun = {
 		{ label = "등대 문과 열쇠", next = "doyun_key" },
 		{ label = "백현식에 대해", next = "doyun_baek" },
 		{ label = "어젯밤 어디 있었나", next = "doyun_night" },
-		{ label = "등대 안으로", next = "lh_inside" },
+		{ label = "등대 안으로", next = "lh_inside", back = true },
 	},
 }
 
@@ -997,7 +997,7 @@ S.scenes.pier = {
 		{ label = "서연우와 이야기한다", next = "talk_seo" },
 		{ label = "돌비석을 본다", next = "pier_memorial" },
 		{ label = "경찰선을 기다리며 보고서를 쓴다", next = "report", cond = flag("can_report") },
-		{ label = "마당으로", next = "yard" },
+		{ label = "마당으로", next = "yard", back = true },
 	},
 }
 
@@ -1011,7 +1011,7 @@ S.scenes.pier_memorial = {
 비석 앞에 마른 국화. 그리고 오늘 아침에 놓인 듯한, 아직 젖어 있는 담배 한 개비.]],
 	on_enter = clue("memorial"),
 	choices = {
-		{ label = "선착장으로", next = "pier" },
+		{ label = "선착장으로", next = "pier", back = true },
 	},
 }
 
@@ -1036,7 +1036,7 @@ S.scenes.talk_seo = {
 		{ label = "백현식을 아는가", next = "seo_baek" },
 		{ label = "기자증과 전보를 내민다", next = "seo_confess", cond = all(has("press_id"), has("telegram"), noflag("seo_admitted")) },
 		{ label = "백현식이 고백했다고 말한다", next = "seo_confess", cond = all(flag("baek_admitted"), noflag("seo_admitted")) },
-		{ label = "선착장으로", next = "pier" },
+		{ label = "선착장으로", next = "pier", back = true },
 	},
 }
 
@@ -1092,7 +1092,7 @@ S.scenes.seo_confess = {
 		st:add_clue("logbook")
 	end,
 	choices = {
-		{ label = "다른 것을 묻는다", next = "talk_seo" },
+		{ label = "다른 것을 묻는다", next = "talk_seo", back = true },
 	},
 }
 

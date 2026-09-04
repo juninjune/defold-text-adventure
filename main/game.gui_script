@@ -6,25 +6,39 @@ local story = require("main.story")
 local art = require("main.art")
 
 ------------------------------------------------------------
--- layout constants
+-- layout constants (720x1560 portrait, origin bottom-left)
 ------------------------------------------------------------
 
-local SCREEN_W, SCREEN_H = 960, 720
+local SCREEN_W, SCREEN_H = 720, 1560
 
--- illustration banner under the header; body text starts below it
-local ART_W, ART_H, ART_TOP = 840, 168, 668
-local TITLE_ART_H, TITLE_ART_TOP = 300, 700
-local CLUE_ART_H = 240
+local MARGIN, CONTENT_W = 40, 640
+local SAFE_TOP, SAFE_BOTTOM = 96, 72
 
-local BODY_X, BODY_TOP, BODY_W = 60, 660, 840 -- screens without a banner
-local BODY_TOP_ART = ART_TOP - ART_H - 22
-local CHOICE_X, CHOICE_W = 60, 840
-local CHOICE_COL_W, CHOICE_GAP = 412, 16
-local BTN_H, BTN_PITCH, BLOCK_BOTTOM = 48, 56, 40
+-- illustration banner under the header; body text starts below it.
+-- textures are rendered at their original pixel size (art.lua keeps every
+-- illustration keyed to that canvas) and the display box is scaled down.
+local ART_W, ART_H, ART_TOP = 720, 144, 1388
+local ART_TEX_W, ART_TEX_H = 840, 168
+local TITLE_ART_W, TITLE_ART_H, TITLE_ART_TOP = 720, 257, SCREEN_H - SAFE_TOP
+local TITLE_ART_TEX_W, TITLE_ART_TEX_H = 840, 300
+local CLUE_ART_H = 206
+local CLUE_ART_TEX_W, CLUE_ART_TEX_H = 840, 240
 
-local HEADER_TITLE_X, HEADER_TITLE_Y = 60, 702
-local HEADER_DIVIDER_Y = 680
-local HEADER_RIGHT_X, HEADER_RIGHT_Y = 900, 698
+local BODY_X, BODY_TOP, BODY_W = MARGIN, 1380, CONTENT_W -- screens without a banner
+local BODY_TOP_ART = ART_TOP - ART_H - 24
+local BODY_LEADING = 1.45
+local CHOICE_X, CHOICE_W = MARGIN, CONTENT_W
+local CHOICE_COL_W, CHOICE_GAP = 312, 16
+local BTN_H, BTN_PITCH, BLOCK_BOTTOM = 96, 108, 60
+
+local HEADER_TITLE_X, HEADER_TITLE_Y = MARGIN, 1440
+local HEADER_DIVIDER_Y = 1400
+local HEADER_RIGHT_X, HEADER_RIGHT_Y = SCREEN_W - MARGIN, 1440
+
+local TOAST_Y = 1000
+
+local TITLE_HEADING_Y = 950
+local TITLE_SUB_Y = 860
 
 local CIRCLED_DIGITS = { "①", "②", "③", "④", "⑤", "⑥" }
 
@@ -51,6 +65,8 @@ local BTN_LABEL_COLOR = hex(0xd8d2c2)
 local BTN_HOVER_FILL_COLOR = hex(0x2b3245)
 local BTN_HOVER_LABEL_COLOR = hex(0xffffff)
 local BTN_DISABLED_LABEL_COLOR = hex(0x5a5f6a)
+local GHOST_FILL_COLOR = hex(0x1c2029, 0) -- ghost ("back") buttons: no fill, dim border+label
+local GHOST_LABEL_COLOR = hex(0x9aa0a8) -- same value as TITLE_SUB_COLOR, defined below
 local TOAST_BG_COLOR = hex(0x2f3646)
 local TOAST_TEXT_COLOR = hex(0xf0e8d0)
 local TITLE_TITLE_COLOR = hex(0xf2ecd8)
@@ -106,6 +122,7 @@ local function new_state()
 	state.flags = {}
 	state.clues = {}
 	state.clue_order = {}
+	state.unread = {}
 	state.visited = {}
 	state.report = {}
 	state.attempts = 0
@@ -114,6 +131,7 @@ local function new_state()
 	function state:add_clue(id)
 		if self.clues[id] then return false end
 		self.clues[id] = true
+		self.unread[id] = true
 		table.insert(self.clue_order, id)
 		table.insert(self._pending_toasts, id)
 		return true
@@ -122,6 +140,11 @@ local function new_state()
 	function state:has(id) return self.clues[id] == true end
 	function state:set(flag, v) self.flags[flag] = v end
 	function state:get(flag) return self.flags[flag] end
+	function state:unread_count()
+		local n = 0
+		for _ in pairs(self.unread) do n = n + 1 end
+		return n
+	end
 
 	return state
 end
@@ -202,19 +225,10 @@ end
 -- choice layout
 ------------------------------------------------------------
 
--- decide 1-column vs 2-column layout and how tall the block is
+-- portrait layout: choices are always a single full-width column
 local function compute_choice_layout(items)
-	local n = #items
-	local one_col = n <= 3
-	if not one_col then
-		for _, it in ipairs(items) do
-			if utf8_len(it.label) > 16 then one_col = true break end
-		end
-	end
-	local cols = one_col and 1 or 2
-	local rows = one_col and n or math.ceil(n / 2)
-	if rows < 1 then rows = 1 end
-	return { cols = cols, rows = rows, block_top = BLOCK_BOTTOM + rows * BTN_PITCH }
+	local n = math.max(1, #items)
+	return { cols = 1, rows = n, block_top = BLOCK_BOTTOM + n * BTN_PITCH }
 end
 
 ------------------------------------------------------------
@@ -223,34 +237,42 @@ end
 
 -- wrapped text node; w/h are the FINAL visual size, scale divides it back
 -- into node-local units the way gui.set_scale expects
-local function create_text(self, text, x, y, w, scale, color, pivot, leading)
+local function create_text(self, text, x, y, w, scale, color, pivot, leading, font)
 	local node = gui.new_text_node(vmath.vector3(x, y, 0), text)
-	gui.set_font(node, "korean")
+	gui.set_font(node, font or "korean")
 	gui.set_pivot(node, pivot)
 	gui.set_scale(node, vmath.vector3(scale, scale, 1))
 	gui.set_size(node, vmath.vector3(w / scale, 2000, 0))
 	gui.set_line_break(node, true)
 	gui.set_leading(node, leading or 1.0)
 	gui.set_color(node, color)
+	gui.set_adjust_mode(node, gui.ADJUST_FIT)
 	table.insert(self.nodes, node)
 	return node
 end
 
 -- a bordered box button with a centered label; registers itself for
--- hover/click handling unless disabled
-local function create_button(self, cx, cy, w, h, label, on_click, disabled)
+-- hover/click handling unless disabled. ghost buttons (semantically "go
+-- back") keep the same size/position but drop the fill and dim the
+-- border+label, per create_button's ghost arg
+local function create_button(self, cx, cy, w, h, label, on_click, disabled, font, ghost)
 	local pos = vmath.vector3(cx, cy, 0)
 	local back = gui.new_box_node(pos, vmath.vector3(w, h, 0))
-	gui.set_color(back, BTN_BORDER_COLOR)
+	gui.set_color(back, ghost and DIVIDER_COLOR or BTN_BORDER_COLOR)
+	gui.set_adjust_mode(back, gui.ADJUST_FIT)
 
 	local front = gui.new_box_node(pos, vmath.vector3(w - 8, h - 8, 0))
-	gui.set_color(front, BTN_FILL_COLOR)
+	local fill_color = ghost and GHOST_FILL_COLOR or BTN_FILL_COLOR
+	gui.set_color(front, fill_color)
+	gui.set_adjust_mode(front, gui.ADJUST_FIT)
 
 	local lbl = gui.new_text_node(pos, label)
-	gui.set_font(lbl, "korean")
+	gui.set_font(lbl, font or "korean")
 	gui.set_pivot(lbl, gui.PIVOT_CENTER)
-	gui.set_scale(lbl, vmath.vector3(0.8, 0.8, 1))
-	gui.set_color(lbl, disabled and BTN_DISABLED_LABEL_COLOR or BTN_LABEL_COLOR)
+	gui.set_scale(lbl, vmath.vector3(1.0, 1.0, 1))
+	local base_label_color = ghost and GHOST_LABEL_COLOR or BTN_LABEL_COLOR
+	gui.set_color(lbl, disabled and BTN_DISABLED_LABEL_COLOR or base_label_color)
+	gui.set_adjust_mode(lbl, gui.ADJUST_FIT)
 
 	table.insert(self.nodes, back)
 	table.insert(self.nodes, front)
@@ -261,10 +283,11 @@ local function create_button(self, cx, cy, w, h, label, on_click, disabled)
 			hit = front,
 			front = front,
 			label = lbl,
-			base_front = BTN_FILL_COLOR,
-			base_label = BTN_LABEL_COLOR,
-			hover_front = BTN_HOVER_FILL_COLOR,
-			hover_label = BTN_HOVER_LABEL_COLOR,
+			back = back,
+			base_front = fill_color,
+			base_label = base_label_color,
+			hover_front = ghost and fill_color or BTN_HOVER_FILL_COLOR, -- ghost stays fill-less on hover
+			hover_label = ghost and BTN_LABEL_COLOR or BTN_HOVER_LABEL_COLOR,
 			on_click = on_click,
 		})
 	end
@@ -272,7 +295,7 @@ local function create_button(self, cx, cy, w, h, label, on_click, disabled)
 	return { back, front, lbl }
 end
 
--- lay out a list of {label, on_click, disabled} items into buttons
+-- lay out a list of {label, on_click, disabled, font, ghost} items into buttons
 local function build_choices(self, items, layout, btn_h, pitch)
 	btn_h = btn_h or BTN_H
 	pitch = pitch or BTN_PITCH
@@ -293,7 +316,7 @@ local function build_choices(self, items, layout, btn_h, pitch)
 			w = CHOICE_COL_W
 			cx = CHOICE_X + col * (CHOICE_COL_W + CHOICE_GAP) + CHOICE_COL_W / 2
 		end
-		local created = create_button(self, cx, cy, w, btn_h, it.label, it.on_click, it.disabled)
+		local created = create_button(self, cx, cy, w, btn_h, it.label, it.on_click, it.disabled, it.font, it.ghost)
 		for _, n in ipairs(created) do table.insert(nodes, n) end
 		if not it.disabled and it.on_click then
 			local b = self.buttons[#self.buttons]
@@ -306,9 +329,9 @@ end
 
 -- small pill button anchored to its right edge, used in the header
 local function create_header_button(self, right_x, cy, label, on_click)
-	local w, h = 150, 34
-	create_button(self, right_x - w / 2, cy, w, h, label, on_click, false)
-	return w
+	local w, h = 220, 64
+	local nodes = create_button(self, right_x - w / 2, cy, w, h, label, on_click, false)
+	return w, nodes
 end
 
 ------------------------------------------------------------
@@ -323,11 +346,37 @@ local function clear_screen(self)
 	self.buttons = {}
 	self.hovered = nil
 	self.advance_btn = nil
+	self.blink_token = nil -- invalidate any in-flight header-button blink
 end
 
--- dithered illustration banner: 1px frame + textured box, top edge at top_y
-local function create_art(self, key, top_y, h)
-	local data, tw, th = art.render(key, ART_W, h)
+-- pulses a set of nodes' alpha between 1.0 and 0.45 forever, driven by
+-- chained one-shot animate + timer.delay calls (rather than gui.animate's
+-- own PLAYBACK_LOOP_PINGPONG) so it can be cleanly stopped: clear_screen
+-- clears self.blink_token, and each queued step checks it's still current
+-- before touching nodes that may have already been deleted by then
+local function start_blink(self, nodes)
+	local token = {}
+	self.blink_token = token
+	local function pulse(low)
+		if self.blink_token ~= token then return end
+		local target = low and 0.45 or 1.0
+		for _, n in ipairs(nodes) do
+			gui.animate(n, "color.w", target, gui.EASING_INOUTSINE, 1.0)
+		end
+		timer.delay(1.0, false, function()
+			if self.blink_token ~= token then return end
+			pulse(not low)
+		end)
+	end
+	pulse(true)
+end
+
+-- dithered illustration banner: 1px frame + textured box, top edge at top_y.
+-- the texture is always rendered at its native (tex_w x tex_h) size so the
+-- 53 illustrations stay pixel-identical; disp_w/disp_h just scale the box
+-- that displays it.
+local function create_art(self, key, top_y, disp_w, disp_h, tex_w, tex_h)
+	local data, tw, th = art.render(key, tex_w, tex_h)
 	local tex = "art:" .. key .. ":" .. tw .. "x" .. th
 	if not self.textures[tex] then
 		local ok, reason = gui.new_texture(tex, tw, th, "rgb", data)
@@ -338,11 +387,13 @@ local function create_art(self, key, top_y, h)
 			return {}
 		end
 	end
-	local cy = top_y - th / 2
-	local frame = gui.new_box_node(vmath.vector3(480, cy, 0), vmath.vector3(tw + 2, th + 2, 0))
+	local cx, cy = SCREEN_W / 2, top_y - disp_h / 2
+	local frame = gui.new_box_node(vmath.vector3(cx, cy, 0), vmath.vector3(disp_w + 2, disp_h + 2, 0))
 	gui.set_color(frame, DIVIDER_COLOR)
-	local box = gui.new_box_node(vmath.vector3(480, cy, 0), vmath.vector3(tw, th, 0))
+	gui.set_adjust_mode(frame, gui.ADJUST_FIT)
+	local box = gui.new_box_node(vmath.vector3(cx, cy, 0), vmath.vector3(disp_w, disp_h, 0))
 	gui.set_texture(box, tex)
+	gui.set_adjust_mode(box, gui.ADJUST_FIT)
 	table.insert(self.nodes, frame)
 	table.insert(self.nodes, box)
 	return { frame, box }
@@ -367,30 +418,43 @@ local function process_toast_queue(self)
 
 	local clue = self.story.clues[cid]
 	local text = "수첩에 기록 — " .. clue.title
-	-- header-row toast: never overlaps body text; shrink to 0.6 if it would be wider than 480px
-	local scale = 0.7
-	local w = math.max(220, utf8_len(text) * 16 + 48)
-	if w > 480 then
-		scale = 0.6
-		w = math.min(480, math.max(220, utf8_len(text) * 16 * (0.6 / 0.7) + 48))
+	-- centered mid-screen toast: full scale unless the text would overflow
+	-- the content width, then shrink (never below 0.7)
+	local scale = 1.0
+	local w = math.max(280, utf8_len(text) * 34 + 64)
+	if w > CONTENT_W then
+		scale = math.max(0.7, CONTENT_W / w)
+		w = CONTENT_W
 	end
+	local h = 76
+	local cx = SCREEN_W / 2
 
-	local box = gui.new_box_node(vmath.vector3(480, 700, 0), vmath.vector3(w, 44, 0))
+	local border = gui.new_box_node(vmath.vector3(cx, TOAST_Y, 0), vmath.vector3(w + 4, h + 4, 0))
+	gui.set_color(border, BTN_BORDER_COLOR)
+	gui.set_adjust_mode(border, gui.ADJUST_FIT)
+	gui.set_alpha(border, 0)
+
+	local box = gui.new_box_node(vmath.vector3(cx, TOAST_Y, 0), vmath.vector3(w, h, 0))
 	gui.set_color(box, TOAST_BG_COLOR)
+	gui.set_adjust_mode(box, gui.ADJUST_FIT)
 	gui.set_alpha(box, 0)
 
-	local lbl = gui.new_text_node(vmath.vector3(480, 700, 0), text)
+	local lbl = gui.new_text_node(vmath.vector3(cx, TOAST_Y, 0), text)
 	gui.set_font(lbl, "korean")
 	gui.set_pivot(lbl, gui.PIVOT_CENTER)
 	gui.set_scale(lbl, vmath.vector3(scale, scale, 1))
 	gui.set_color(lbl, TOAST_TEXT_COLOR)
+	gui.set_adjust_mode(lbl, gui.ADJUST_FIT)
 	gui.set_alpha(lbl, 0)
 
+	gui.animate(border, "color.w", 1, gui.EASING_OUTQUAD, 0.2)
 	gui.animate(box, "color.w", 1, gui.EASING_OUTQUAD, 0.2)
 	gui.animate(lbl, "color.w", 1, gui.EASING_OUTQUAD, 0.2, 0, function()
 		timer.delay(2.2, false, function()
+			gui.animate(border, "color.w", 0, gui.EASING_OUTQUAD, 0.3)
 			gui.animate(box, "color.w", 0, gui.EASING_OUTQUAD, 0.3)
 			gui.animate(lbl, "color.w", 0, gui.EASING_OUTQUAD, 0.3, 0, function()
+				gui.delete_node(border)
 				gui.delete_node(box)
 				gui.delete_node(lbl)
 				self.toast_active = false
@@ -416,30 +480,34 @@ local goto_scene, enter_scene, render_scene, render_title_body, render_page, bui
 local render_report, render_report_result, open_option_select, submit_report, enter_notebook
 local render_notebook_page, open_clue
 
--- header: title, divider, notebook button, page indicator
+-- header: title, divider, notebook button (blinks while clues are unread), page indicator
 function build_header(self)
 	local scr = self.screen
 	if scr.hide_header then return end
 
-	create_text(self, scr.title or "", HEADER_TITLE_X, HEADER_TITLE_Y, 700, 0.7,
+	create_text(self, scr.title or "", HEADER_TITLE_X, HEADER_TITLE_Y, 380, 0.85,
 		scr.header_color or HEADER_TITLE_COLOR, gui.PIVOT_NW, 1.0)
 
-	local divider = gui.new_box_node(vmath.vector3(480, HEADER_DIVIDER_Y, 0), vmath.vector3(CHOICE_W, 1, 0))
+	local divider = gui.new_box_node(vmath.vector3(SCREEN_W / 2, HEADER_DIVIDER_Y, 0), vmath.vector3(CHOICE_W, 1, 0))
 	gui.set_color(divider, DIVIDER_COLOR)
+	gui.set_adjust_mode(divider, gui.ADJUST_FIT)
 	table.insert(self.nodes, divider)
 
 	local right_x = HEADER_RIGHT_X
 	local n_clues = #self.state.clue_order
 	if scr.show_notebook and n_clues >= 1 then
 		local label = string.format("수첩 (%d)", n_clues)
-		local w = create_header_button(self, right_x, HEADER_RIGHT_Y, label, function()
+		local w, nb_nodes = create_header_button(self, right_x, HEADER_RIGHT_Y, label, function()
 			goto_scene(self, "@notebook")
 		end)
+		if self.state:unread_count() > 0 then
+			start_blink(self, nb_nodes)
+		end
 		right_x = right_x - w - 16
 	end
 
 	if scr.pages and #scr.pages >= 2 then
-		create_text(self, string.format("%d / %d", scr.page, #scr.pages), right_x, HEADER_TITLE_Y, 120, 0.6,
+		create_text(self, string.format("%d / %d", scr.page, #scr.pages), right_x, HEADER_TITLE_Y, 120, 0.75,
 			PAGE_INDICATOR_COLOR, gui.PIVOT_NE, 1.0)
 	end
 end
@@ -452,9 +520,9 @@ function render_page(self)
 	local text = scr.pages[scr.page]
 	local fade = {}
 	if scr.art then
-		for _, n in ipairs(create_art(self, scr.art, ART_TOP, ART_H)) do table.insert(fade, n) end
+		for _, n in ipairs(create_art(self, scr.art, ART_TOP, ART_W, ART_H, ART_TEX_W, ART_TEX_H)) do table.insert(fade, n) end
 	end
-	local body = create_text(self, text, BODY_X, scr.body_top or BODY_TOP, BODY_W, 1.0, BODY_TEXT_COLOR, gui.PIVOT_NW, 1.15)
+	local body = create_text(self, text, BODY_X, scr.body_top or BODY_TOP, BODY_W, 1.0, BODY_TEXT_COLOR, gui.PIVOT_NW, BODY_LEADING)
 	table.insert(fade, body)
 
 	local is_last = scr.page >= #scr.pages
@@ -485,14 +553,15 @@ function render_page(self)
 	print("SCENE", scr.id, scr.page, #scr.pages)
 end
 
--- choice defs (filtered by cond) -> button items wired to effect+goto_scene
+-- choice defs (filtered by cond) -> button items wired to effect+goto_scene.
+-- a choice is a "back" ghost button when story.lua flags it (back = true)
+-- or it literally goes to "@back"
 local function build_choice_items(self, choices)
 	local items = {}
 	for _, c in ipairs(choices or {}) do
 		if not c.cond or c.cond(self.state) then
-			table.insert(items, { label = c.label, on_click = function()
+			table.insert(items, { label = c.label, ghost = c.back or c.next == "@back", on_click = function()
 				if c.effect then c.effect(self.state) end
-				drain_toasts(self)
 				goto_scene(self, c.next)
 			end })
 		end
@@ -503,11 +572,11 @@ end
 function render_title_body(self, text)
 	local paragraphs = split_paragraphs(text)
 	local nodes = {}
-	table.insert(nodes, create_text(self, paragraphs[1] or "", 480, 340, 800, 1.8, TITLE_TITLE_COLOR, gui.PIVOT_CENTER, 1.15))
+	table.insert(nodes, create_text(self, paragraphs[1] or "", SCREEN_W / 2, TITLE_HEADING_Y, CONTENT_W, 1.6, TITLE_TITLE_COLOR, gui.PIVOT_CENTER, BODY_LEADING))
 	if #paragraphs > 1 then
 		local rest = {}
 		for i = 2, #paragraphs do table.insert(rest, paragraphs[i]) end
-		table.insert(nodes, create_text(self, table.concat(rest, "\n\n"), 480, 290, 800, 0.8, TITLE_SUB_COLOR, gui.PIVOT_N, 1.15))
+		table.insert(nodes, create_text(self, table.concat(rest, "\n\n"), SCREEN_W / 2, TITLE_SUB_Y, CONTENT_W, 0.75, TITLE_SUB_COLOR, gui.PIVOT_N, BODY_LEADING))
 	end
 	return nodes
 end
@@ -522,7 +591,7 @@ function render_scene(self, id, scene)
 		self.screen = { kind = "scene", id = id, title = "", hide_header = true, show_notebook = false }
 		local nodes = {}
 		if scene.art and art.has(scene.art) then
-			nodes = create_art(self, scene.art, TITLE_ART_TOP, TITLE_ART_H)
+			nodes = create_art(self, scene.art, TITLE_ART_TOP, TITLE_ART_W, TITLE_ART_H, TITLE_ART_TEX_W, TITLE_ART_TEX_H)
 		end
 		for _, n in ipairs(render_title_body(self, text)) do table.insert(nodes, n) end
 		local layout = compute_choice_layout(items)
@@ -541,7 +610,7 @@ function render_scene(self, id, scene)
 	local art_key = (scene.art and art.has(scene.art)) and scene.art or nil
 	local body_top = art_key and BODY_TOP_ART or BODY_TOP
 	local avail_h = body_top - (reserve_top + 24)
-	local pages = paginate_paragraphs(self, paragraphs, BODY_W, avail_h, 1.0, 1.15)
+	local pages = paginate_paragraphs(self, paragraphs, BODY_W, avail_h, 1.0, BODY_LEADING)
 
 	self.screen = {
 		kind = "scene", id = id, pages = pages, page = 1,
@@ -554,13 +623,14 @@ function render_scene(self, id, scene)
 	render_page(self)
 end
 
--- notebook: a paged grid of clue titles; each opens a detail screen with its illustration
+-- notebook: a paged single-column list of clue titles; each opens a detail
+-- screen with its illustration. unread clue titles render in semibold.
 function enter_notebook(self, page)
 	local order = self.state.clue_order
 	local total = 0
 	for _ in pairs(self.story.clues or {}) do total = total + 1 end
 
-	local final_items = { { label = "돌아가기", on_click = function() goto_scene(self, "@back") end } }
+	local final_items = { { label = "돌아가기", ghost = true, on_click = function() goto_scene(self, "@back") end } }
 	for _, c in ipairs(self.story.notebook_choices or {}) do
 		if not c.cond or c.cond(self.state) then
 			table.insert(final_items, { label = c.label, on_click = function()
@@ -572,14 +642,15 @@ function enter_notebook(self, page)
 	end
 	local final_layout = compute_choice_layout(final_items)
 
-	-- grid rows that fit between the body top and the nav row (nav row only when paged)
+	-- single-column grid rows that fit between the body top and the nav
+	-- row (nav row only when paged)
 	local function rows_avail(with_nav)
 		local top_of_block = final_layout.block_top + (with_nav and BTN_PITCH or 0)
 		return math.floor((BODY_TOP - 8 - (top_of_block + 16)) / BTN_PITCH)
 	end
-	local page_size = rows_avail(false) * 2
-	if #order > page_size then page_size = rows_avail(true) * 2 end
-	page_size = math.max(2, page_size)
+	local page_size = rows_avail(false)
+	if #order > page_size then page_size = rows_avail(true) end
+	page_size = math.max(1, page_size)
 	self.notebook_page_size = page_size
 
 	local pages = {}
@@ -607,14 +678,15 @@ function render_notebook_page(self)
 	local fade = {}
 
 	if #entries == 0 then
-		table.insert(fade, create_text(self, "아직 기록한 것이 없다.", BODY_X, BODY_TOP, BODY_W, 1.0, BODY_TEXT_COLOR, gui.PIVOT_NW, 1.15))
+		table.insert(fade, create_text(self, "아직 기록한 것이 없다.", BODY_X, BODY_TOP, BODY_W, 1.0, BODY_TEXT_COLOR, gui.PIVOT_NW, BODY_LEADING))
 	else
 		local items = {}
 		for _, e in ipairs(entries) do
 			local clue = self.story.clues[e.id]
-			table.insert(items, { label = clue.title, on_click = function() open_clue(self, e.index) end })
+			local font = self.state.unread[e.id] and "korean_sb" or nil
+			table.insert(items, { label = clue.title, font = font, on_click = function() open_clue(self, e.index) end })
 		end
-		local layout = { cols = 2, rows = math.ceil(#items / 2), block_top = BODY_TOP - 8 }
+		local layout = { cols = 1, rows = #items, block_top = BODY_TOP - 8 }
 		for _, n in ipairs(build_choices(self, items, layout)) do table.insert(fade, n) end
 	end
 
@@ -633,11 +705,13 @@ function render_notebook_page(self)
 	print("SCENE", scr.id, scr.page, n_pages)
 end
 
--- one clue: illustration banner + description + prev/next
+-- one clue: illustration banner + description + prev/next; opening it
+-- clears its unread flag so the header stops blinking once all are read
 function open_clue(self, idx)
 	clear_screen(self)
 	local order = self.state.clue_order
 	local cid = order[idx]
+	self.state.unread[cid] = nil
 	local clue = self.story.clues[cid]
 	local key = "clue:" .. cid
 
@@ -649,13 +723,13 @@ function open_clue(self, idx)
 	local fade = {}
 	local body_top = BODY_TOP
 	if art.has(key) then
-		for _, n in ipairs(create_art(self, key, ART_TOP, CLUE_ART_H)) do table.insert(fade, n) end
+		for _, n in ipairs(create_art(self, key, ART_TOP, ART_W, CLUE_ART_H, CLUE_ART_TEX_W, CLUE_ART_TEX_H)) do table.insert(fade, n) end
 		body_top = ART_TOP - CLUE_ART_H - 22
 	end
-	table.insert(fade, create_text(self, clue.text, BODY_X, body_top, BODY_W, 1.0, BODY_TEXT_COLOR, gui.PIVOT_NW, 1.15))
+	table.insert(fade, create_text(self, clue.text, BODY_X, body_top, BODY_W, 1.0, BODY_TEXT_COLOR, gui.PIVOT_NW, BODY_LEADING))
 
 	local page_of = math.ceil(idx / (self.notebook_page_size or 1))
-	local final_items = { { label = "수첩으로", on_click = function() enter_notebook(self, page_of) end } }
+	local final_items = { { label = "수첩으로", ghost = true, on_click = function() enter_notebook(self, page_of) end } }
 	local final_layout = compute_choice_layout(final_items)
 	local nav = {
 		{ label = "◀ 이전 단서", disabled = idx <= 1, on_click = function() open_clue(self, idx - 1) end },
@@ -678,10 +752,10 @@ function open_option_select(self, report_id, slot)
 			render_report(self, report_id)
 		end })
 	end
-	table.insert(items, { label = "취소", on_click = function() render_report(self, report_id) end })
+	table.insert(items, { label = "취소", ghost = true, on_click = function() render_report(self, report_id) end })
 
 	self.screen = { kind = "option_select", id = "option_select:" .. slot.id, title = slot.label, show_notebook = false }
-	local body = create_text(self, "해당하는 것을 고르시오.", BODY_X, BODY_TOP, BODY_W, 1.0, BODY_TEXT_COLOR, gui.PIVOT_NW, 1.15)
+	local body = create_text(self, "해당하는 것을 고르시오.", BODY_X, BODY_TOP, BODY_W, 1.0, BODY_TEXT_COLOR, gui.PIVOT_NW, BODY_LEADING)
 	local layout = compute_choice_layout(items)
 	local fade = { body }
 	local cnodes = build_choices(self, items, layout)
@@ -696,12 +770,7 @@ function render_report(self, id)
 	local scene = self.story.scenes[id]
 	local n_slots = #scene.slots
 	local rows = n_slots + 2
-
-	local btn_h, pitch, body_scale = BTN_H, BTN_PITCH, 1.0
-	if rows > 6 then
-		btn_h, pitch, body_scale = 44, 52, 0.85
-	end
-	local block_top = BLOCK_BOTTOM + rows * pitch
+	local block_top = BLOCK_BOTTOM + rows * BTN_PITCH
 
 	local items = {}
 	for i, slot in ipairs(scene.slots) do
@@ -718,16 +787,16 @@ function render_report(self, id)
 	table.insert(items, { label = scene.submit_label or "제출", disabled = not can_submit, on_click = function()
 		submit_report(self, id)
 	end })
-	table.insert(items, { label = "돌아가기", on_click = function() goto_scene(self, scene.back) end })
+	table.insert(items, { label = "돌아가기", ghost = true, on_click = function() goto_scene(self, scene.back) end })
 
 	self.screen = { kind = "report", id = id, title = scene.title, show_notebook = false }
 
 	local text = scene.text
 	if type(text) == "function" then text = text(self.state) end
-	local body = create_text(self, text, BODY_X, BODY_TOP, BODY_W, body_scale, BODY_TEXT_COLOR, gui.PIVOT_NW, 1.15)
+	local body = create_text(self, text, BODY_X, BODY_TOP, BODY_W, 1.0, BODY_TEXT_COLOR, gui.PIVOT_NW, BODY_LEADING)
 	local fade = { body }
 	local layout = { cols = 1, rows = rows, block_top = block_top }
-	local cnodes = build_choices(self, items, layout, btn_h, pitch)
+	local cnodes = build_choices(self, items, layout, BTN_H, BTN_PITCH)
 	for _, n in ipairs(cnodes) do table.insert(fade, n) end
 	fade_in(fade)
 	build_header(self)
@@ -754,7 +823,7 @@ function render_report_result(self, id, n_wrong)
 	local text = scene.wrong_text(n_wrong, self.state.attempts)
 
 	self.screen = { kind = "report_result", id = "report_result:" .. id, title = scene.title, show_notebook = false }
-	local body = create_text(self, text, BODY_X, BODY_TOP, BODY_W, 1.0, BODY_TEXT_COLOR, gui.PIVOT_NW, 1.15)
+	local body = create_text(self, text, BODY_X, BODY_TOP, BODY_W, 1.0, BODY_TEXT_COLOR, gui.PIVOT_NW, BODY_LEADING)
 	local items = { { label = "다시 살펴본다", on_click = function() render_report(self, id) end } }
 	local layout = compute_choice_layout(items)
 	local fade = { body }
@@ -772,12 +841,14 @@ function enter_scene(self, id)
 	self.state.visited[id] = (self.state.visited[id] or 0) + 1
 	local scene = self.story.scenes[id]
 	if scene.on_enter then scene.on_enter(self.state) end
-	drain_toasts(self)
 	if scene.type == "report" then
 		render_report(self, id)
 	else
 		render_scene(self, id, scene)
 	end
+	-- drained after the new screen finishes building its nodes, so the
+	-- toast (created here, last) draws on top instead of underneath it
+	drain_toasts(self)
 end
 
 function goto_scene(self, raw_id)
@@ -882,6 +953,7 @@ function init(self)
 	self.textures = {}
 	self.scene_stack = {}
 	self.screen = nil
+	self.blink_token = nil
 
 	self.debug = sys.get_engine_info().is_debug
 	if self.debug then
@@ -896,15 +968,17 @@ function init(self)
 
 	self.state = new_state()
 
-	self.bg = gui.new_box_node(vmath.vector3(480, SCREEN_H / 2, 0), vmath.vector3(SCREEN_W, SCREEN_H, 0))
+	self.bg = gui.new_box_node(vmath.vector3(SCREEN_W / 2, SCREEN_H / 2, 0), vmath.vector3(SCREEN_W, SCREEN_H, 0))
 	gui.set_color(self.bg, BG_COLOR)
+	gui.set_adjust_mode(self.bg, gui.ADJUST_FIT)
 
 	-- debug builds may jump straight to a scene: game.project [adv] start = <scene id>
 	local start = self.story.start
 	if self.debug then
 		local override = sys.get_config_string("adv.start", "")
 		if override ~= "" and (self.story.scenes[override] or override == "@notebook") then start = override end
-		-- [adv] all_clues = 1 fills the notebook with every clue (for checking clue screens)
+		-- [adv] all_clues = 1 fills the notebook with every clue, all marked
+		-- unread, so the notebook grid and header blink can be checked
 		if sys.get_config_int("adv.all_clues", 0) == 1 then
 			local ids = {}
 			for cid in pairs(self.story.clues) do table.insert(ids, cid) end

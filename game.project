@@ -5,8 +5,8 @@ main_collection = /main/main.collectionc
 shared_state = 1
 
 [display]
-width = 960
-height = 720
+width = 720
+height = 1560
 high_dpi = 1
 
 [android]
@@ -17,7 +17,13 @@ gravity_y = -1000.0
 scale = 0.01
 
 [html5]
-scale_mode = stretch
+scale_mode = fit
+
+[render]
+clear_color_red = 0.0706
+clear_color_green = 0.0784
+clear_color_blue = 0.1020
+clear_color_alpha = 1.0
 
 [project]
 title = 안개 속의 여섯 사람

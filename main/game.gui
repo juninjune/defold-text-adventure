@@ -3,6 +3,10 @@ fonts {
   name: "korean"
   font: "/main/korean.font"
 }
+fonts {
+  name: "korean_sb"
+  font: "/main/korean_sb.font"
+}
 background_color {
   x: 0.0
   y: 0.0
