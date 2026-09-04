@@ -13,7 +13,7 @@ Defold로 만든 클릭 선택형 미스터리 텍스트 어드벤처. 『Return
 
 ### 웹으로 플레이
 
-https://juninjune.github.io/defold-text-adventure/ 에서 설치 없이 바로 플레이한다. 세로 화면(720×1560) 기준이라 폰 브라우저에 맞고, PC 브라우저에서는 가운데 세로 기둥으로 뜬다. 폰에서는 「홈 화면에 추가」로 앱처럼 쓸 수 있다. 진행 저장은 아직 없다.
+https://juninjune.github.io/defold-text-adventure/ 에서 설치 없이 바로 플레이한다. 세로 화면(720×1560) 기준이라 폰 브라우저에 맞고, PC 브라우저에서는 가운데 세로 기둥으로 뜬다. 폰에서는 「홈 화면에 추가」로 앱처럼 쓸 수 있다. 장면이 바뀔 때마다 자동 저장되며(브라우저에서는 IndexedDB에 남는다), 다음에 열면 타이틀에 「이어하기」가 떠서 중단한 곳부터 계속할 수 있다.
 
 HTML5 빌드(Project ▸ Build HTML5)의 결과물을 `gh-pages` 브랜치에 그대로 올리면 배포된다. 자세한 절차는 AGENTS.md의 "HTML5 deploy" 절.
 

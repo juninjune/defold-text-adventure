@@ -114,6 +114,29 @@ local function split_sentences(text)
 end
 
 ------------------------------------------------------------
+-- save/load helpers (sys.save/sys.load; on HTML5 this persists via
+-- IndexedDB, so the same code path works in the browser build)
+------------------------------------------------------------
+
+local SAVE_VERSION = 1
+
+local function save_path()
+	return sys.get_save_file("defold-text-adventure", "save1")
+end
+
+local function copy_map(t)
+	local out = {}
+	for k, v in pairs(t) do out[k] = v end
+	return out
+end
+
+local function copy_array(t)
+	local out = {}
+	for i, v in ipairs(t) do out[i] = v end
+	return out
+end
+
+------------------------------------------------------------
 -- state object passed into story.lua callbacks
 ------------------------------------------------------------
 
@@ -146,6 +169,33 @@ local function new_state()
 		return n
 	end
 
+	-- pure-data snapshot of everything worth persisting (no functions, no
+	-- shared table references with the live state)
+	function state:snapshot()
+		return {
+			flags = copy_map(self.flags),
+			clues = copy_map(self.clues),
+			clue_order = copy_array(self.clue_order),
+			unread = copy_map(self.unread),
+			visited = copy_map(self.visited),
+			report = copy_map(self.report),
+			attempts = self.attempts,
+		}
+	end
+
+	return state
+end
+
+-- rebuild a live state object (with its methods) from a saved snapshot
+local function restore_state(data)
+	local state = new_state()
+	state.flags = copy_map(data.flags)
+	state.clues = copy_map(data.clues)
+	state.clue_order = copy_array(data.clue_order)
+	state.unread = copy_map(data.unread)
+	state.visited = copy_map(data.visited)
+	state.report = copy_map(data.report)
+	state.attempts = data.attempts or 0
 	return state
 end
 
@@ -473,12 +523,60 @@ local function drain_toasts(self)
 end
 
 ------------------------------------------------------------
+-- save file
+------------------------------------------------------------
+
+-- writes the current story progress; scene_id is "the scene the player is
+-- looking at" (never a notebook/clue/report/option-select overlay screen).
+-- no-ops under a debug [adv] override so testing never clobbers a real save.
+local function write_save(self, scene_id)
+	if not self.save_enabled or not scene_id then return end
+	local snap = self.state:snapshot()
+	local data = {
+		version = SAVE_VERSION,
+		scene = scene_id,
+		stack = copy_array(self.scene_stack),
+		clue_order = snap.clue_order,
+		clues = snap.clues,
+		unread = snap.unread,
+		flags = snap.flags,
+		visited = snap.visited,
+		report = snap.report,
+		attempts = snap.attempts,
+	}
+	sys.save(save_path(), data)
+	self.save_scene = scene_id
+	if self.debug then print("SAVE", scene_id) end
+end
+
+-- returns the saved data table, or nil if there's no save, it's the wrong
+-- version, it's missing a required field, or its scene no longer exists
+-- (story.lua changed underneath it)
+local function read_save(self)
+	local ok, data = pcall(sys.load, save_path())
+	if not ok or type(data) ~= "table" then return nil end
+	if data.version ~= SAVE_VERSION then return nil end
+	if type(data.scene) ~= "string" or not self.story.scenes[data.scene] then return nil end
+	if type(data.stack) ~= "table" or type(data.clue_order) ~= "table" or type(data.clues) ~= "table"
+		or type(data.unread) ~= "table" or type(data.flags) ~= "table" or type(data.visited) ~= "table"
+		or type(data.report) ~= "table" then
+		return nil
+	end
+	return data
+end
+
+local function clear_save(self)
+	pcall(os.remove, save_path())
+	if self.debug then print("SAVE_CLEAR") end
+end
+
+------------------------------------------------------------
 -- scene / notebook / report rendering (mutually recursive)
 ------------------------------------------------------------
 
 local goto_scene, enter_scene, render_scene, render_title_body, render_page, build_header
 local render_report, render_report_result, open_option_select, submit_report, enter_notebook
-local render_notebook_page, open_clue
+local render_notebook_page, open_clue, resume_scene, load_and_resume
 
 -- header: title, divider, notebook button (blinks while clues are unread), page indicator
 function build_header(self)
@@ -594,8 +692,25 @@ function render_scene(self, id, scene)
 			nodes = create_art(self, scene.art, TITLE_ART_TOP, TITLE_ART_W, TITLE_ART_H, TITLE_ART_TEX_W, TITLE_ART_TEX_H)
 		end
 		for _, n in ipairs(render_title_body(self, text)) do table.insert(nodes, n) end
-		local layout = compute_choice_layout(items)
-		local cnodes = build_choices(self, items, layout)
+
+		-- a valid save swaps the story's own title choice(s) for
+		-- 이어하기/처음부터; 처음부터 just deletes the save and replays
+		-- the story's first title choice, so its target is never hardcoded here
+		local title_items = items
+		local save_data = self.save_enabled and read_save(self) or nil
+		if save_data then
+			local restart_item = items[1]
+			title_items = {
+				{ label = "이어하기", on_click = function() load_and_resume(self, save_data) end },
+				{ label = "처음부터", ghost = true, on_click = function()
+					clear_save(self)
+					if restart_item then restart_item.on_click() end
+				end },
+			}
+		end
+
+		local layout = compute_choice_layout(title_items)
+		local cnodes = build_choices(self, title_items, layout)
 		for _, n in ipairs(cnodes) do table.insert(nodes, n) end
 		fade_in(nodes)
 		build_header(self)
@@ -749,6 +864,7 @@ function open_option_select(self, report_id, slot)
 	for i, opt in ipairs(slot.options) do
 		table.insert(items, { label = opt, on_click = function()
 			self.state.report[slot.id] = i
+			write_save(self, self.save_scene) -- persist the pick right away
 			render_report(self, report_id)
 		end })
 	end
@@ -846,9 +962,41 @@ function enter_scene(self, id)
 	else
 		render_scene(self, id, scene)
 	end
+	-- the report screen and the title screen aren't save points: report
+	-- stays "inside" whatever scene opened it (its slot picks are saved
+	-- separately, see open_option_select), and title has nothing to resume
+	if scene.type ~= "report" and scene.style ~= "title" then
+		write_save(self, id)
+	end
 	-- drained after the new screen finishes building its nodes, so the
 	-- toast (created here, last) draws on top instead of underneath it
 	drain_toasts(self)
+end
+
+-- renders an already-restored scene without re-running on_enter or choice
+-- effects: their state mutations are already baked into the snapshot, so
+-- re-running them would re-grant clues, re-pop toasts, etc.
+function resume_scene(self, id)
+	local scene = self.story.scenes[id]
+	if scene.type == "report" then
+		render_report(self, id)
+	else
+		render_scene(self, id, scene)
+	end
+	drain_toasts(self)
+end
+
+function load_and_resume(self, data)
+	self.state = restore_state(data)
+	self.scene_stack = copy_array(data.stack)
+	if #self.scene_stack == 0 then table.insert(self.scene_stack, data.scene) end
+	self.save_scene = data.scene
+	if self.debug then
+		local n = 0
+		for _ in pairs(self.state.clues) do n = n + 1 end
+		print("LOAD", data.scene, n)
+	end
+	resume_scene(self, data.scene)
 end
 
 function goto_scene(self, raw_id)
@@ -856,6 +1004,7 @@ function goto_scene(self, raw_id)
 	if type(id) == "function" then id = id(self.state) end
 
 	if id == "@restart" then
+		clear_save(self)
 		self.state = new_state()
 		self.scene_stack = {}
 		enter_scene(self, self.story.start)
@@ -954,6 +1103,8 @@ function init(self)
 	self.scene_stack = {}
 	self.screen = nil
 	self.blink_token = nil
+	self.save_scene = nil
+	self.save_enabled = true
 
 	self.debug = sys.get_engine_info().is_debug
 	if self.debug then
@@ -976,10 +1127,16 @@ function init(self)
 	local start = self.story.start
 	if self.debug then
 		local override = sys.get_config_string("adv.start", "")
+		local all_clues_on = sys.get_config_int("adv.all_clues", 0) == 1
+		-- either debug override means this run neither reads nor writes the
+		-- real save file, so testing can never clobber actual progress
+		if override ~= "" or all_clues_on then
+			self.save_enabled = false
+		end
 		if override ~= "" and (self.story.scenes[override] or override == "@notebook") then start = override end
 		-- [adv] all_clues = 1 fills the notebook with every clue, all marked
 		-- unread, so the notebook grid and header blink can be checked
-		if sys.get_config_int("adv.all_clues", 0) == 1 then
+		if all_clues_on then
 			local ids = {}
 			for cid in pairs(self.story.clues) do table.insert(ids, cid) end
 			table.sort(ids)
