@@ -23,6 +23,14 @@ No Bob CLI or standalone `lua` is installed; the editor build is the only build 
 - To inspect one scene without clicking through, set `[adv] start = <scene id>` (or `@notebook`) in `game.project` and rebuild (debug builds only; unknown ids are ignored). `[adv] all_clues = 1` pre-fills every clue so notebook/clue screens can be checked. Restore `start =` (empty) and `all_clues = 0` before finishing.
 - Real-mouse UI check: the game window belongs to the `dmengine` process (`pgrep -f dmengine`). `orca computer get-app-state --app pid:$PID --json` screenshots it; `orca computer click` cannot focus it, so click with `cliclick m:X,Y w:120 dd:X,Y w:120 du:X,Y` using screen coords = window origin (from `orca computer list-windows`, re-query it — macOS may shrink the 720x1560 window to fit the screen, e.g. down to 720x950 including the 32 px title bar; screenshots are 2x that) + window-local coords converted from the design (720x1560, bottom-left origin) by the same uniform FIT scale the GUI itself uses. A press and release inside the same frame is dropped by Defold, hence the delay. An inactive window can swallow the first click, so click a neutral header spot (e.g. local 300,55) before the real click. The window can also intermittently report "no on-screen window" between calls; retry with `--restore-window` and re-fetch its bounds rather than reusing stale coordinates.
 
+## HTML5 deploy (GitHub Pages)
+
+- Public build: https://juninjune.github.io/defold-text-adventure/ served from the `gh-pages` branch (root, `.nojekyll`). `main` holds sources only.
+- Build: `curl -X POST http://localhost:$PORT/command/build-html5` (returns `202`; wait ~30 s until `dmloader.js` in the output is non-empty). Output: `build/default_html5/__htmlLaunchDir/<project title>/` (index.html, dmloader.js, dmengine.wasm, dmengine_wasm.js, archive/).
+- `game.project [html5]`: `scale_mode = fit`, `cssfile = /assets/web/style.css` (dark page, canvas centred, template button bar hidden). The page `<html lang>` is the template default (`en`); changing it needs a custom `htmlfile` template.
+- Publish: copy the launch dir into a scratch folder, `git init -b gh-pages`, add `.nojekyll`, commit, `git push -f origin gh-pages`. Pages is already enabled on that branch; a push redeploys within about a minute. Check with `gh api repos/juninjune/defold-text-adventure/pages/builds/latest`.
+- Local test: `python3 -m http.server 8765` inside the launch dir, open in Chrome with `--window-size=480,1000`; a `file://` open is refused by the template.
+
 ## Architecture
 
 - `game.project` bootstraps `/main/main.collection`: one game object with one `gui` component (`main/game.gui`). The `.gui` file declares only the font; every node is created in code.
