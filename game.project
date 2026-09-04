@@ -18,6 +18,10 @@ scale = 0.01
 
 [html5]
 scale_mode = fit
+cssfile = /assets/web/style.css
+show_fullscreen_button = 0
+show_made_with_defold = 0
+show_console_banner = 0
 
 [render]
 clear_color_red = 0.0706

@@ -1,0 +1,55 @@
+/* Custom HTML5 stylesheet (game.project [html5] cssfile). Replaces the
+   default Defold template CSS: dark page matching the in-game background,
+   canvas centred, no button bar or splash artwork. */
+html, body {
+	margin: 0;
+	padding: 0;
+	background-color: #12141a;
+}
+body {
+	position: fixed; /* prevent overscroll on mobile */
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	-webkit-tap-highlight-color: rgba(0,0,0,0);
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+.canvas-app-container {
+	width: 100%;
+	height: 100%;
+	position: absolute;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	background-color: #12141a;
+}
+.canvas-app-container:-webkit-full-screen {
+	width: auto;
+	height: auto;
+}
+#canvas-container {
+	position: relative;
+}
+#canvas {
+	outline: none;
+	border: 0;
+	vertical-align: bottom;
+	image-rendering: auto;
+}
+canvas:focus, canvas:active {
+	outline: none;
+	border: 0;
+}
+.buttons-background {
+	display: none;
+}
+#running-from-file-warning, #webgl-not-supported {
+	color: #e6e0cf;
+	font-family: sans-serif;
+}
+a { color: #c9a961; }
